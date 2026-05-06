@@ -1,3 +1,3 @@
-module github.com/nduyhai/go-module
+module github.com/nduyhai/lockx
 
 go 1.26.0
