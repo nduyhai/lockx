@@ -88,9 +88,9 @@ state.View(func(v *State) {
 Use at least Go 1.18 because `TryLock` / `TryRLock` require it.
 
 ```go
-module github.com/yourname/lockx
+module github.com/nduyhai/lockx
 
-go 1.22
+go 1.26
 ```
 
 ## License
