@@ -1,50 +1,34 @@
 package lockx
 
-import "sync"
+import "context"
 
-type Value[T any] struct {
-	mu sync.Mutex
-	v  T
+type Locker[T any] interface {
+	With(fn func(v *T))
+	WithErr(fn func(v *T) error) error
+
+	TryWith(fn func(v *T)) bool
+	TryWithErr(fn func(v *T) error) (bool, error)
+
+	Load() T
+	Store(v T)
+	Swap(v T) T
+	Update(fn func(old T) T)
 }
 
-func New[T any](initial T) *Value[T] {
-	return &Value[T]{v: initial}
+type RWLocker[T any] interface {
+	Locker[T]
+
+	View(fn func(v *T))
+	ViewErr(fn func(v *T) error) error
+
+	TryView(fn func(v *T)) bool
+	TryViewErr(fn func(v *T) error) (bool, error)
 }
 
-func (x *Value[T]) With(fn func(v *T)) {
-	x.mu.Lock()
-	defer x.mu.Unlock()
+// ContextLocker Real context-aware lock.
+type ContextLocker[T any] interface {
+	Locker[T]
 
-	fn(&x.v)
-}
-
-func (x *Value[T]) Load() T {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	return x.v
-}
-
-func (x *Value[T]) Store(v T) {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	x.v = v
-}
-
-func (x *Value[T]) Swap(v T) T {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	old := x.v
-	x.v = v
-
-	return old
-}
-
-func (x *Value[T]) Update(fn func(old T) T) {
-	x.mu.Lock()
-	defer x.mu.Unlock()
-
-	x.v = fn(x.v)
+	WithContext(ctx context.Context, fn func(v *T)) error
+	WithContextErr(ctx context.Context, fn func(v *T) error) error
 }

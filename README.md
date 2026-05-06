@@ -1,6 +1,6 @@
 # lockx
 
-[![Go](https://img.shields.io/badge/go-1.26+-blue)](https://go.dev/)
+[![Go](https://img.shields.io/badge/go-1.18+-blue)](https://go.dev/)
 [![License](https://img.shields.io/github/license/nduyhai/lockx)](LICENSE)
 
 `lockx` is a simple, thread-safe wrapper for values in Go using generics. It provides a clean API for concurrent access and modification of shared state.
@@ -10,6 +10,8 @@
 - ✅ Generic support for any type
 - ✅ Thread-safe operations (Load, Store, Swap, Update)
 - ✅ `With` method for direct, protected access to the underlying value
+- ✅ Context-aware locking
+- ✅ RWLock support with fast `View` method
 - ✅ Simple and idiomatic API
 
 ## Installation
@@ -20,45 +22,76 @@ go get github.com/nduyhai/lockx
 
 ## Usage
 
-### Basic Example
+### Mutex
 
 ```go
-package main
+counter := lockx.NewMutex(0)
 
-import (
-	"fmt"
-	"github.com/nduyhai/lockx"
-)
-
-func main() {
-	// Create a new thread-safe value
-	counter := lockx.New(0)
-
-	// Update the value
-	counter.Update(func(old int) int {
-		return old + 1
-	})
-
-	// Load the value
-	fmt.Println("Counter:", counter.Load()) // Output: Counter: 1
-
-	// Direct access using With
-	counter.With(func(v *int) {
-		*v += 10
-	})
-
-	fmt.Println("Counter after With:", counter.Load()) // Output: Counter after With: 11
-}
+counter.With(func(v *int) {
+	*v++
+})
 ```
 
-### Methods
+### Context-aware
 
-- `New[T](initial T) *Value[T]`: Creates a new thread-safe value.
-- `Load() T`: Atomically loads and returns the value.
-- `Store(v T)`: Atomically stores a new value.
-- `Swap(v T) T`: Atomically swaps the value and returns the old one.
-- `Update(fn func(old T) T)`: Atomically updates the value using the provided function.
-- `With(fn func(v *T))`: Executes a function with a pointer to the underlying value while holding the lock.
+```go
+counter := lockx.NewContext(0)
+
+ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+defer cancel()
+
+err := counter.WithContext(ctx, func(v *int) {
+	*v++
+})
+```
+
+### RWMutex
+
+```go
+state := lockx.NewRW(MyStruct{})
+
+// Read-only view
+state.View(func(v *MyStruct) {
+    fmt.Println(v.Name)
+})
+
+// Update
+state.With(func(v *MyStruct) {
+    v.Name = "new name"
+})
+```
+
+#### Important warning for RW.View
+
+`View(fn func(v *T))` is fast because it avoids copying large structs.
+
+But users **must not mutate** inside `View`, because it only holds a read lock.
+
+Example safe usage:
+
+```go
+state.View(func(v *State) {
+	fmt.Println(v.Name)
+})
+```
+
+Bad usage:
+
+```go
+state.View(func(v *State) {
+	v.Name = "changed" // don't do this
+})
+```
+
+## go.mod
+
+Use at least Go 1.18 because `TryLock` / `TryRLock` require it.
+
+```go
+module github.com/yourname/lockx
+
+go 1.22
+```
 
 ## License
 
